@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crash Spaceman Clone - Dev Mode</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --primary: #38bdf8;
+            --accent: #f43f5e;
+            --text: #f8fafc;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        #game-container {
+            width: 90%;
+            max-width: 800px;
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+
+        /* Grafik Area */
+        #display-area {
+            height: 300px;
+            background: radial-gradient(circle, #1e293b 0%, #020617 100%);
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 2px solid #334155;
+        }
+
+        #multiplier {
+            font-size: 5rem;
+            font-weight: bold;
+            z-index: 10;
+        }
+
+        /* UI Kontrol */
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            background: #0f172a;
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        input {
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            width: 100px;
+        }
+
+        button {
+            padding: 10px 25px;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+
+        #btn-bet { background-color: var(--primary); color: white; }
+        #btn-bet:disabled { background-color: #64748b; }
+        #btn-cashout { background-color: #10b981; color: white; display: none; }
+
+        .crashed { color: var(--accent) !important; }
+        .running { color: var(--primary); }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <h2>🚀 SPACE CRASH DEV</h2>
+        
+        <div class="stats">
+            <div>SALDO: <span id="balance">1000</span> IDR</div>
+            <div>STATUS: <span id="status">Menunggu Taruhan</span></div>
+        </div>
+
+        <div id="display-area">
+            <div id="multiplier" class="running">1.00x</div>
+        </div>
+
+        <div class="stats">
+            <div id="history">History: </div>
+        </div>
+
+        <div class="controls">
+            <input type="number" id="bet-amount" placeholder="Bet Amount" value="10">
+            <button id="btn-bet" onclick="startGame()">PASANG TARUHAN</button>
+            <button id="btn-cashout" onclick="cashOut()">CASHOUT</button>
+        </div>
+    </div>
+
+    <p style="font-size: 0.8rem; color: #475569; margin-top: 20px;">
+        Admin Secret: Tekan 'K' untuk setting RNG
+    </p>
+
+    <script>
+        // --- Game State ---
+        let balance = 1000;
+        let currentMultiplier = 1.00;
+        let betAmount = 0;
+        let isRunning = false;
+        let gameInterval;
+        let crashPoint = 0;
+        
+        // --- Admin RNG Control ---
+        let adminOverrideValue = null;
+
+        const multiplierEl = document.getElementById('multiplier');
+        const balanceEl = document.getElementById('balance');
+        const btnBet = document.getElementById('btn-bet');
+        const btnCashout = document.getElementById('btn-cashout');
+        const historyEl = document.getElementById('history');
+
+        // Logic RNG (Algoritma)
+        function generateCrashPoint() {
+            // Jika admin sudah set nilai, gunakan nilai tersebut sekali
+            if (adminOverrideValue) {
+                let val = adminOverrideValue;
+                adminOverrideValue = null; // Reset setelah dipakai
+                return val;
+            }
+            
+            // Logika standar: 99% rumah menang sedikit, 1% bisa meledak tinggi
+            const e = 2**32;
+            const h = crypto.getRandomValues(new Uint32Array(1))[0];
+            return Math.max(1, (100 * e - h) / (e - h) / 100).toFixed(2);
+        }
+
+        function startGame() {
+            betAmount = parseFloat(document.getElementById('bet-amount').value);
+            if (betAmount > balance || betAmount <= 0) return alert("Saldo tidak cukup!");
+
+            balance -= betAmount;
+            updateUI();
+            
+            isRunning = true;
+            currentMultiplier = 1.00;
+            crashPoint = generateCrashPoint();
+            console.log("Dev Hint: Crash at " + crashPoint); // Cek konsol untuk tahu kapan crash
+
+            btnBet.disabled = true;
+            btnCashout.style.display = "inline-block";
+            multiplierEl.className = "running";
+            
+            gameInterval = setInterval(() => {
+                currentMultiplier += 0.01 + (currentMultiplier * 0.005);
+                multiplierEl.innerText = currentMultiplier.toFixed(2) + "x";
+
+                if (currentMultiplier >= crashPoint) {
+                    endGame(true);
+                }
+            }, 100);
+        }
+
+        function cashOut() {
+            if (!isRunning) return;
+            let winAmount = betAmount * currentMultiplier;
+            balance += winAmount;
+            endGame(false);
+            alert("Menang: " + winAmount.toFixed(2));
+        }
+
+        function endGame(isCrash) {
+            clearInterval(gameInterval);
+            isRunning = false;
+            
+            if (isCrash) {
+                multiplierEl.innerText = "CRASHED @ " + crashPoint + "x";
+                multiplierEl.className = "crashed";
+            }
+
+            addToHistory(crashPoint);
+            btnBet.disabled = false;
+            btnCashout.style.display = "none";
+            updateUI();
+        }
+
+        function updateUI() {
+            balanceEl.innerText = balance.toFixed(2);
+        }
+
+        function addToHistory(val) {
+            const span = document.createElement('span');
+            span.style.margin = "0 5px";
+            span.style.color = val > 2 ? "#10b981" : "#f43f5e";
+            span.innerText = val + "x";
+            historyEl.appendChild(span);
+        }
+
+        // --- Fitur Rahasia Admin ---
+        window.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === 'k') {
+                let password = prompt("Masukkan Admin Key:");
+                if (password === "admin123") { // Ganti password ini
+                    let nextVal = prompt("Atur Crash Point berikutnya (contoh: 10.5):");
+                    adminOverrideValue = parseFloat(nextVal);
+                    alert("RNG Berhasil di-set ke: " + adminOverrideValue);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
